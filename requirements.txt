@@ -1,0 +1,14 @@
+python-dotenv
+langchain
+langchain_huggingface
+langchain_community
+sentence-transformers
+tiktoken
+unstructured
+huggingface_hub
+g4f
+pypdf
+fitz
+PyMuPDF
+pinecone
+curl_cffi

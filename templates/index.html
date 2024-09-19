@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Chatbot</title>
+    <style>
+        /* Basic styling for the chat interface */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+        .container {
+            width: 60%;
+            max-width: 800px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        #chat-box {
+            width: 97%;
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: scroll;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        #chat-box p {
+            margin: 10px 0;
+        }
+        #user-input {
+            width: calc(100% - 110px);
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-right: 10px;
+        }
+        #send-btn {
+            padding: 10px 20px;
+            border: none;
+            background-color: #007bff;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #send-btn:disabled {
+            background-color: #cccccc;
+        }
+        #upload-section {
+            margin-bottom: 20px;
+        }
+        /* Loading spinner */
+        .spinner {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Section for file upload -->
+        <div id="upload-section">
+            <h3>Upload PDF Document</h3>
+            <input type="file" id="pdf-upload" accept=".pdf">
+            <button id="upload-btn">Upload</button>
+            <div id="loading-spinner" class="spinner"></div> <!-- Loading spinner -->
+        </div>
+
+        <!-- Chat Interface -->
+        <div>
+            <h3>Chat with the PDF</h3>
+            <div id="chat-box"></div>
+            <input type="text" id="user-input" placeholder="Ask a question...">
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Handle file upload
+        document.getElementById('upload-btn').addEventListener('click', function () {
+            const fileInput = document.getElementById('pdf-upload');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a PDF file to upload.');
+                return;
+            }
+
+            // Show loading spinner
+            const spinner = document.getElementById('loading-spinner');
+            spinner.style.display = 'inline-block';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading spinner
+                spinner.style.display = 'none';
+
+                if (data.success) {
+                    alert('File uploaded and ingested successfully!');
+                } else {
+                    alert('Failed to upload file: ' + data.message);
+                }
+            })
+            .catch(error => {
+                // Hide loading spinner
+                spinner.style.display = 'none';
+
+                console.error('Error:', error);
+                alert('An error occurred while uploading the file.');
+            });
+        });
+
+        // Handle chat interactions
+        document.getElementById('send-btn').addEventListener('click', function () {
+            const userInput = document.getElementById('user-input').value;
+            if (!userInput) {
+                alert('Please enter a question.');
+                return;
+            }
+
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML += `<p><strong>You:</strong> ${userInput}</p>`;
+
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: userInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                chatBox.innerHTML += `<p><strong>Bot:</strong> ${data.response}</p>`;
+                chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while chatting with the bot.');
+            });
+
+            document.getElementById('user-input').value = ''; // Clear the input
+        });
+    </script>
+</body>
+</html>
