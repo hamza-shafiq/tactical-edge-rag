@@ -1,4 +1,5 @@
 flask
+openai
 python-dotenv
 langchain
 langchain_huggingface

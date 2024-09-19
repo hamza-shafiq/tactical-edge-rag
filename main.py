@@ -1,5 +1,6 @@
 import os
 import fitz
+import openai
 from langchain.schema import Document
 from pinecone import Pinecone, ServerlessSpec
 
@@ -7,15 +8,14 @@ from langchain_community.vectorstores import Pinecone as PC
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from dotenv import load_dotenv
-from g4f.client import Client
 
 from sentence_transformers import SentenceTransformer
 EMBEDDING_MODEL = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
 
 global_instance = None
-g4f_client = Client()
 load_dotenv()
 
+OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 PINECONE_INDEX = os.environ.get("PINECONE_INDEX")
 PINECONE_INSTANCE = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 
@@ -25,6 +25,12 @@ class TacticalEdgeAssistant:
         self.embeddings = HuggingFaceEmbeddings()
         self.pinecone_index = self.get_db_instance()
         self.pinecone_db = None
+        self.retriever = self.initialize_retriever()
+
+    def initialize_retriever(self):
+        pinecone_db = PC.from_existing_index(PINECONE_INDEX, self.embeddings)
+        retriever = pinecone_db.as_retriever(search_type="mmr", search_kwargs={"k": 3})
+        return retriever
 
     def store_new_embedding(self, pdf_content, file_name):
         # Convert the text into the Document format required by langchain
@@ -70,32 +76,38 @@ class TacticalEdgeAssistant:
 
     @staticmethod
     def augmentation(context, user_input):
-        prompt = f"""
-            You are an AI assistant with access to a detailed financial and business performance report for FY2024.
-            Use the context provided to answer questions accurately and comprehensively.
+        try:
+            prompt = f"""
+                You are an AI assistant with access to a detailed financial and business performance report for FY2024.
+                Use the context provided to answer questions accurately and comprehensively.
 
-            Context: {context}
-            Your task is to provide a concise and clear response based on this context.
-            If the context doesn't contain enough information to answer the question,
-            please indicate that the information is not available.
+                Context: {context}
+                Your task is to provide a concise and clear response based on this context.
+                If the context doesn't contain enough information to answer the question,
+                please indicate that the information is not available.
 
-            Question: {user_input}
-            Answer: """
+                Question: {user_input}
+                Answer: """
 
-        response = g4f_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        reply = response.choices[0].message.content
-        print(f"Response: {reply}")
-        return reply
+            response = openai.chat.completions.create(
+                model=OPENAI_MODEL,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            reply = response.choices[0].message.content
+            print(f"Response: {reply}")
+            return reply
+        except Exception as ex:
+            print(ex)
+            raise Exception("Error: Rate limit exceeded, please try again")
 
     def answer_retriever(self, user_input):
         context_content, source = None, None
-        pinecone_db = PC.from_existing_index(PINECONE_INDEX, self.embeddings)
-        retriever = pinecone_db.as_retriever(search_type="mmr", search_kwargs={"k": 3})
+        if not self.retriever:
+            return None, None
 
-        matched_docs = retriever.invoke(user_input)
+        matched_docs = self.retriever.invoke(user_input)
         if matched_docs:
             context = matched_docs[0]
             context_content = matched_docs[0].page_content
