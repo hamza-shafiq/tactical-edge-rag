@@ -43,10 +43,14 @@ def chat():
     if not query:
         return jsonify({'response': 'No query provided.'}), 400
 
-    answer, source = ai_search.answer_retriever(query)
-    refined_answer = ai_search.augmentation(answer, query)
+    context, source = ai_search.answer_retriever(query)
 
-    return jsonify({'response': refined_answer})
+    final_answer = "It seems there's no information related to your query at the moment. " \
+                   "If you have specific documents, please upload them to enrich my knowledge base."
+    if context:
+        final_answer = ai_search.augmentation(context, query)
+
+    return jsonify({'response': final_answer})
 
 
 if __name__ == '__main__':
